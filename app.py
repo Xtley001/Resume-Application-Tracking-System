@@ -8,6 +8,8 @@ import base64
 import pdf2image
 import io
 from PIL import Image
+pdf2image==1.16.0  
+
 
 # Load environment variables
 load_dotenv()
