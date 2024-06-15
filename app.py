@@ -8,8 +8,8 @@ import base64
 import pdf2image
 import io
 from PIL import Image
-pdf2image
-
+import plotly.express as px
+import plotly.graph_objects as go
 
 # Load environment variables
 load_dotenv()
@@ -66,6 +66,11 @@ job_description = st.text_area("Paste the Job Description:")
 # File uploader for resume (PDF) input
 uploaded_file = st.file_uploader("Upload Your Resume (PDF)...", type=["pdf"])
 
+# Adding widgets
+st.sidebar.header("Customize Your Experience")
+show_summary = st.sidebar.checkbox("Show Profile Summary")
+match_threshold = st.sidebar.slider("Set Match Threshold", 0, 100, 85)
+
 # Submit button for processing the resume and job description
 submit = st.button("Submit")
 
@@ -81,19 +86,39 @@ if submit:
             # Get response from Gemini API
             response = get_gemini_response(input_prompt_filled)
             
+            # Parse response
+            response_json = json.loads(response)
+            
             # Display the Gemini Response in a block format
-            st.markdown("### Gemini Response:")
-            st.code(response, language='json')
+            st.markdown("### Response:")
+            st.json(response_json)
             
-            # Calculate percentage match (you can refine this logic as per your requirements)
-            # For demonstration, we assume a simple percentage calculation
-            # Replace this with your actual logic for calculating percentage match
-            percentage_match = 85  # Example value, replace with actual calculation
+            # Extract percentage match and missing keywords
+            percentage_match = int(response_json.get("JD Match", "0").strip('%'))
+            missing_keywords = response_json.get("MissingKeywords", [])
             
+            # Display percentage match
             st.markdown("### Percentage Match:")
             st.write(f"{percentage_match}%")
+            
+            # Display pie chart for percentage match
+            fig = go.Figure(data=[go.Pie(labels=['Match', 'Gap'], values=[percentage_match, 100 - percentage_match])])
+            st.plotly_chart(fig)
+            
+            # Display bar chart for missing keywords
+            if missing_keywords:
+                keyword_counts = {keyword: 1 for keyword in missing_keywords}
+                keywords_df = pd.DataFrame(list(keyword_counts.items()), columns=['Keyword', 'Count'])
+                bar_fig = px.bar(keywords_df, x='Keyword', y='Count', title='Missing Keywords')
+                st.plotly_chart(bar_fig)
+            
+            # Optionally show profile summary
+            if show_summary:
+                st.markdown("### Profile Summary:")
+                st.write(response_json.get("Profile Summary", "No profile summary available."))
             
         except Exception as e:
             st.error(f"Error: {str(e)}")
     else:
         st.warning("Please upload a resume.")
+
