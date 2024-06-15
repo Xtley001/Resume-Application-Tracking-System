@@ -1,3 +1,4 @@
+from flask import Flask, render_template
 import streamlit as st
 import google.generativeai as genai
 import os
@@ -10,6 +11,7 @@ import io
 from PIL import Image
 import plotly.express as px
 import plotly.graph_objects as go
+import pandas as pd
 
 # Load environment variables
 load_dotenv()
@@ -56,69 +58,79 @@ I want the response in a structured format:
 {{"JD Match": "%", "MissingKeywords": [], "Profile Summary": ""}}
 """
 
-# Streamlit App
-st.set_page_config(page_title="Resume Evaluation Assistant")
-st.title("Resume Evaluation Assistant")
+# Flask app
+app = Flask(__name__)
 
-# Text area for job description input
-job_description = st.text_area("Paste the Job Description:")
+@app.route('/')
+def index():
+    # Streamlit App within Flask
+    st.set_page_config(page_title="Resume Evaluation Assistant")
+    st.title("Resume Evaluation Assistant")
 
-# File uploader for resume (PDF) input
-uploaded_file = st.file_uploader("Upload Your Resume (PDF)...", type=["pdf"])
+    # Text area for job description input
+    job_description = st.text_area("Paste the Job Description:")
 
-# Adding widgets
-st.sidebar.header("Customize Your Experience")
-show_summary = st.sidebar.checkbox("Show Profile Summary")
-match_threshold = st.sidebar.slider("Set Match Threshold", 0, 100, 85)
+    # File uploader for resume (PDF) input
+    uploaded_file = st.file_uploader("Upload Your Resume (PDF)...", type=["pdf"])
 
-# Submit button for processing the resume and job description
-submit = st.button("Submit")
+    # Adding widgets
+    st.sidebar.header("Customize Your Experience")
+    show_summary = st.sidebar.checkbox("Show Profile Summary")
+    match_threshold = st.sidebar.slider("Set Match Threshold", 0, 100, 85)
 
-if submit:
-    if uploaded_file is not None:
-        try:
-            # Extract text from PDF
-            resume_text = input_pdf_text(uploaded_file)
-            
-            # Prepare prompt with extracted resume text and job description
-            input_prompt_filled = input_prompt.format(text=resume_text, job_description=job_description)
-            
-            # Get response from Gemini API
-            response = get_gemini_response(input_prompt_filled)
-            
-            # Parse response
-            response_json = json.loads(response)
-            
-            # Display the Gemini Response in a block format
-            st.markdown("### Response:")
-            st.json(response_json)
-            
-            # Extract percentage match and missing keywords
-            percentage_match = int(response_json.get("JD Match", "0").strip('%'))
-            missing_keywords = response_json.get("MissingKeywords", [])
-            
-            # Display percentage match
-            st.markdown("### Percentage Match:")
-            st.write(f"{percentage_match}%")
-            
-            # Display pie chart for percentage match
-            fig = go.Figure(data=[go.Pie(labels=['Match', 'Gap'], values=[percentage_match, 100 - percentage_match])])
-            st.plotly_chart(fig)
-            
-            # Display bar chart for missing keywords
-            if missing_keywords:
-                keyword_counts = {keyword: 1 for keyword in missing_keywords}
-                keywords_df = pd.DataFrame(list(keyword_counts.items()), columns=['Keyword', 'Count'])
-                bar_fig = px.bar(keywords_df, x='Keyword', y='Count', title='Missing Keywords')
-                st.plotly_chart(bar_fig)
-            
-            # Optionally show profile summary
-            if show_summary:
-                st.markdown("### Profile Summary:")
-                st.write(response_json.get("Profile Summary", "No profile summary available."))
-            
-        except Exception as e:
-            st.error(f"Error: {str(e)}")
-    else:
-        st.warning("Please upload a resume.")
+    # Submit button for processing the resume and job description
+    submit = st.button("Submit")
+
+    if submit:
+        if uploaded_file is not None:
+            try:
+                # Extract text from PDF
+                resume_text = input_pdf_text(uploaded_file)
+                
+                # Prepare prompt with extracted resume text and job description
+                input_prompt_filled = input_prompt.format(text=resume_text, job_description=job_description)
+                
+                # Get response from Gemini API
+                response = get_gemini_response(input_prompt_filled)
+                
+                # Parse response
+                response_json = json.loads(response)
+                
+                # Display the Gemini Response in a block format
+                st.markdown("### Response:")
+                st.json(response_json)
+                
+                # Extract percentage match and missing keywords
+                percentage_match = int(response_json.get("JD Match", "0").strip('%'))
+                missing_keywords = response_json.get("MissingKeywords", [])
+                
+                # Display percentage match
+                st.markdown("### Percentage Match:")
+                st.write(f"{percentage_match}%")
+                
+                # Display pie chart for percentage match
+                fig = go.Figure(data=[go.Pie(labels=['Match', 'Gap'], values=[percentage_match, 100 - percentage_match])])
+                st.plotly_chart(fig)
+                
+                # Display bar chart for missing keywords
+                if missing_keywords:
+                    keyword_counts = {keyword: 1 for keyword in missing_keywords}
+                    keywords_df = pd.DataFrame(list(keyword_counts.items()), columns=['Keyword', 'Count'])
+                    bar_fig = px.bar(keywords_df, x='Keyword', y='Count', title='Missing Keywords')
+                    st.plotly_chart(bar_fig)
+                
+                # Optionally show profile summary
+                if show_summary:
+                    st.markdown("### Profile Summary:")
+                    st.write(response_json.get("Profile Summary", "No profile summary available."))
+                
+            except Exception as e:
+                st.error(f"Error: {str(e)}")
+        else:
+            st.warning("Please upload a resume.")
+
+    return "Streamlit app embedded in Flask"
+
+if __name__ == '__main__':
+    app.run()
 
