@@ -1,6 +1,7 @@
-Flask==2.1.0
-python-dotenv==0.19.2
-PyPDF2==1.26.0
-pdf2image==1.16.0
-Pillow==8.4.0
+streamlit
 google-generativeai
+PyPDF2
+python-dotenv
+pdf2image
+Pillow
+plotly
