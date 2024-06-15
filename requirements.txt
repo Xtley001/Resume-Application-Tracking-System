@@ -5,3 +5,5 @@ python-dotenv
 pdf2image
 Pillow
 plotly
+pandas
+flask
