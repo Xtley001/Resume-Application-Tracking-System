@@ -8,7 +8,7 @@ import base64
 import pdf2image
 import io
 from PIL import Image
-pdf2image==1.16.0  
+pdf2image
 
 
 # Load environment variables
