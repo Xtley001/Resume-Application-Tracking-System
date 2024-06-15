@@ -2,6 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 import os
 import PyPDF2 as pdf
+from docx import Document
 from dotenv import load_dotenv
 import json
 import base64
@@ -10,6 +11,9 @@ import io
 from PIL import Image
 import plotly.express as px
 import plotly.graph_objects as go
+import pandas as pd
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
 
 # Load environment variables
 load_dotenv()
@@ -32,22 +36,40 @@ def input_pdf_text(uploaded_file):
         text += page.extract_text()
     return text
 
-# Prompt Template for data science, data analyst, AI/ML engineer, DevOps, and MLOps roles
+# Function to extract text from uploaded DOCX file
+def input_docx_text(uploaded_file):
+    doc = Document(uploaded_file)
+    text = ""
+    for paragraph in doc.paragraphs:
+        text += paragraph.text + "\n"
+    return text
+
+# Function to extract text from uploaded TXT file
+def input_txt_text(uploaded_file):
+    return uploaded_file.read().decode("utf-8")
+
+# Function to generate word cloud
+def generate_wordcloud(text):
+    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
+    return wordcloud
+
+# Generalized Prompt Template for various job roles
 input_prompt = """
 You are an experienced Application Tracking System (ATS) with expertise in evaluating resumes
-for roles in data science, data analysis, AI/ML engineering, DevOps, and MLOps. Your task is to 
-assess the candidate's suitability for the role based on the provided job description.
+for a wide range of job roles across different industries. Your task is to assess the candidate's
+suitability for the role based on the provided job description.
 
-Please assign a percentage match based on how well the resume aligns with the job description 
+Please assign a percentage match based on how well the resume aligns with the job description
 and highlight any missing keywords with high accuracy.
 
 Key areas to evaluate:
-- Technical skills related to data science and analysis (e.g., Python, R, SQL, data visualization)
-- Experience with machine learning algorithms and frameworks (e.g., TensorFlow, PyTorch)
-- Knowledge of cloud platforms and tools (e.g., AWS, Azure, GCP)
-- Proficiency in DevOps practices (e.g., Docker, Kubernetes) and CI/CD pipelines
-- Skills in MLOps and model deployment (e.g., MLflow, Kubeflow)
-- Familiarity with Agile methodologies and collaborative tools (e.g., JIRA, Confluence)
+- Relevant skills and competencies
+- Professional experience and achievements
+- Educational background and qualifications
+- Certifications and training
+- Knowledge of industry-specific tools and technologies
+- Soft skills and personal attributes
+- Alignment with the job responsibilities and requirements
 
 resume: {text}
 job_description: {job_description}
@@ -57,14 +79,14 @@ I want the response in a structured format:
 """
 
 # Streamlit App
-st.set_page_config(page_title="Resume Evaluation Assistant")
+st.set_page_config(page_title="# Resume Evaluation Assistant")
 st.title("Resume Evaluation Assistant")
 
 # Text area for job description input
 job_description = st.text_area("Paste the Job Description:")
 
-# File uploader for resume (PDF) input
-uploaded_file = st.file_uploader("Upload Your Resume (PDF)...", type=["pdf"])
+# File uploader for resume input
+uploaded_file = st.file_uploader("Upload Your Resume (PDF, DOCX, TXT)...", type=["pdf", "docx", "txt"])
 
 # Adding widgets
 st.sidebar.header("Customize Your Experience")
@@ -77,47 +99,66 @@ submit = st.button("Submit")
 if submit:
     if uploaded_file is not None:
         try:
-            # Extract text from PDF
-            resume_text = input_pdf_text(uploaded_file)
+            # Extract text based on file type
+            if uploaded_file.type == "application/pdf":
+                resume_text = input_pdf_text(uploaded_file)
+            elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                resume_text = input_docx_text(uploaded_file)
+            elif uploaded_file.type == "text/plain":
+                resume_text = input_txt_text(uploaded_file)
+            else:
+                st.error("Unsupported file format.")
+                resume_text = None
             
-            # Prepare prompt with extracted resume text and job description
-            input_prompt_filled = input_prompt.format(text=resume_text, job_description=job_description)
-            
-            # Get response from Gemini API
-            response = get_gemini_response(input_prompt_filled)
-            
-            # Parse response
-            response_json = json.loads(response)
-            
-            # Display the Gemini Response in a block format
-            st.markdown("### Response:")
-            st.json(response_json)
-            
-            # Extract percentage match and missing keywords
-            percentage_match = int(response_json.get("JD Match", "0").strip('%'))
-            missing_keywords = response_json.get("MissingKeywords", [])
-            
-            # Display percentage match
-            st.markdown("### Percentage Match:")
-            st.write(f"{percentage_match}%")
-            
-            # Display pie chart for percentage match
-            fig = go.Figure(data=[go.Pie(labels=['Match', 'Gap'], values=[percentage_match, 100 - percentage_match])])
-            st.plotly_chart(fig)
-            
-            # Display bar chart for missing keywords
-            if missing_keywords:
-                keyword_counts = {keyword: 1 for keyword in missing_keywords}
-                keywords_df = pd.DataFrame(list(keyword_counts.items()), columns=['Keyword', 'Count'])
-                bar_fig = px.bar(keywords_df, x='Keyword', y='Count', title='Missing Keywords')
-                st.plotly_chart(bar_fig)
-            
-            # Optionally show profile summary
-            if show_summary:
-                st.markdown("### Profile Summary:")
-                st.write(response_json.get("Profile Summary", "No profile summary available."))
+            if resume_text:
+                # Prepare prompt with extracted resume text and job description
+                input_prompt_filled = input_prompt.format(text=resume_text, job_description=job_description)
+                
+                # Get response from Gemini API
+                response = get_gemini_response(input_prompt_filled)
+                
+                # Parse response
+                response_json = json.loads(response)
+                
+                # Display the Gemini Response in a block format
+                st.markdown("### Response:")
+                st.json(response_json)
+                
+                # Extract percentage match and missing keywords
+                percentage_match = int(response_json.get("JD Match", "0").strip('%'))
+                missing_keywords = response_json.get("MissingKeywords", [])
+                
+                # Display percentage match
+                st.markdown("### Percentage Match:")
+                st.write(f"{percentage_match}%")
+                
+                # Display pie chart for percentage match
+                fig = go.Figure(data=[go.Pie(labels=['Match', 'Gap'], values=[percentage_match, 100 - percentage_match])])
+                st.plotly_chart(fig)
+                
+                # Display bar chart for missing keywords
+                if missing_keywords:
+                    keyword_counts = {keyword: 1 for keyword in missing_keywords}
+                    keywords_df = pd.DataFrame(list(keyword_counts.items()), columns=['Keyword', 'Count'])
+                    bar_fig = px.bar(keywords_df, x='Keyword', y='Count', title='Missing Keywords')
+                    st.plotly_chart(bar_fig)
+                
+                # Display word cloud for resume text
+                st.markdown("### Word Cloud:")
+                wordcloud = generate_wordcloud(resume_text)
+                fig, ax = plt.subplots()
+                ax.imshow(wordcloud, interpolation='bilinear')
+                ax.axis('off')
+                st.pyplot(fig)
+                
+                # Optionally show profile summary
+                if show_summary:
+                    st.markdown("### Profile Summary:")
+                    st.write(response_json.get("Profile Summary", "No profile summary available."))
             
         except Exception as e:
             st.error(f"Error: {str(e)}")
     else:
         st.warning("Please upload a resume.")
+
+
