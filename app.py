@@ -5,15 +5,12 @@ import PyPDF2 as pdf
 from docx import Document
 from dotenv import load_dotenv
 import json
-import base64
 import pdf2image
 import io
 from PIL import Image
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
-from wordcloud import WordCloud
-import matplotlib.pyplot as plt
 
 # Load environment variables
 load_dotenv()
@@ -48,11 +45,6 @@ def input_docx_text(uploaded_file):
 def input_txt_text(uploaded_file):
     return uploaded_file.read().decode("utf-8")
 
-# Function to generate word cloud
-def generate_wordcloud(text):
-    wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
-    return wordcloud
-
 # Generalized Prompt Template for various job roles
 input_prompt = """
 You are an experienced Application Tracking System (ATS) with expertise in evaluating resumes
@@ -79,8 +71,8 @@ I want the response in a structured format:
 """
 
 # Streamlit App
-st.set_page_config(page_title="# Resume Evaluation Assistant")
-st.title("Resume Evaluation Assistant")
+st.set_page_config(page_title="SkillSync")
+st.title("## Resume Evaluation Evaluation")
 
 # Text area for job description input
 job_description = st.text_area("Paste the Job Description:")
@@ -143,14 +135,6 @@ if submit:
                     bar_fig = px.bar(keywords_df, x='Keyword', y='Count', title='Missing Keywords')
                     st.plotly_chart(bar_fig)
                 
-                # Display word cloud for resume text
-                st.markdown("### Word Cloud:")
-                wordcloud = generate_wordcloud(resume_text)
-                fig, ax = plt.subplots()
-                ax.imshow(wordcloud, interpolation='bilinear')
-                ax.axis('off')
-                st.pyplot(fig)
-                
                 # Optionally show profile summary
                 if show_summary:
                     st.markdown("### Profile Summary:")
@@ -160,5 +144,7 @@ if submit:
             st.error(f"Error: {str(e)}")
     else:
         st.warning("Please upload a resume.")
+
+
 
 
